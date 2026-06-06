@@ -1,0 +1,1605 @@
+{
+  "name": "LLM Enhanced Threat Intel Correlation Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -80
+      ],
+      "id": "3b0f4f74-e409-4557-a4e6-4052194c8e9b",
+      "webhookId": "56ba60af-3a6a-44a5-a342-6e43a1229673",
+      "credentials": {
+        "telegramApi": {
+          "id": "ZMqmQ0j7uQjKyFJc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "=1676887623",
+        "text": "={{ $json.telegram_report }}",
+        "additionalFields": {}
+      },
+      "name": "Reply to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        4192,
+        -48
+      ],
+      "id": "b2f6f6a3-c81f-4b1b-936c-f5cf880d4221",
+      "webhookId": "c678cb3d-e674-4d5f-bbb0-a690f625c7a2",
+      "credentials": {
+        "telegramApi": {
+          "id": "ZMqmQ0j7uQjKyFJc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://otx.alienvault.com/api/v1/pulses/search?q={{ $('Input validation').item.json.product }}%20{{ $('Input validation').item.json.version }}%20{{$json.keywords}}&sort=modified&limit=5",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-OTX-API-KEY",
+              "value": "YOUR_OTX_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        976,
+        -496
+      ],
+      "id": "bc1b64ae-e8d0-462f-bff2-bfea79e88174",
+      "name": "Loop OTX Search"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "keywords, keywords",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -496
+      ],
+      "id": "c20fd4fa-4925-42cc-806a-898dedf2550a",
+      "name": "Keyword split"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        464,
+        -496
+      ],
+      "id": "35654b9e-4a30-46b8-a960-98d7a4cdbc6f",
+      "name": "CISA"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get product/version from the previous Extract_Product_Info node\nconst product = $('Input validation').first().json.product;   \nconst version = $('Input validation').first().json.version;\n\n// Get the full list of vulnerabilities from the CISA node\nconst kevItems = $items(\"CISA\")[0].json.vulnerabilities || [];\n\n// Filter safely, checking if vendor_product exists\nconst filtered = kevItems.filter(item => {\n    const vendorProduct = item.vendor_product || \"\";\n    const vendorVersion = item.vendor_product_version || \"\";\n\n    return vendorProduct.toLowerCase().includes(product?.toLowerCase()) &&\n           (!version || vendorVersion.includes(version));\n});\n\n// Return only the filtered items\nreturn filtered.map(i => ({ json: i }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        -496
+      ],
+      "id": "bb7fdf95-bd5f-45c7-80bf-527e123a7f0e",
+      "name": "Code in JavaScript1",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_PERPLEXITY_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"sonar\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Provide latest English threat intel for {{ $json.product }} {{ $json.version }} covering CVE, Vulnerability, Exploit, Threat, Malware, IOCs\"\n    }\n  ],\n  \"max_tokens\": 500\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        -80
+      ],
+      "id": "4bb60a72-37e4-46f9-b1eb-9313fb5d567a",
+      "name": "Pplx intel source",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Avv28ieN8BgXyAGT",
+          "name": "pplx header auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the LLM output from \"Pplx intel source\" node\nconst llmOutput = $items(\"Pplx intel source\")[0].json;\n\n// Extract URLs from search_results\nconst urls = (llmOutput.search_results || []).map(item => item.url);\n\n// Return each URL as a separate JSON object\nreturn urls.map(url => ({\n  json: { citation_url: url }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        128
+      ],
+      "id": "fa534fac-051d-4958-94b3-8d19d2f0b77e",
+      "name": "llm intel func"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        592,
+        240
+      ],
+      "id": "3ad686a1-d69b-47e2-98b8-91173bd35dbd",
+      "name": "source loop"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.citation_url }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"User-Agent\": \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36\",\n  \"Accept-Language\": \"en-US,en;q=0.9\",\n  \"Accept\": \"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",\n  \"Referer\": \"https://www.google.com\"\n}\n",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        256
+      ],
+      "id": "3fc08f68-a50e-46a7-8fdc-c8b49913cc4c",
+      "name": "URL Data fetch",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": null,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data || '';\nconst url = $('source loop').first().json.citation_url || 'unknown';\n\n// Heuristics to detect blocked/forbidden pages\nconst blockedPatterns = [\n  /403 Forbidden/i,\n  /Access Denied/i,\n  /You don't have permission to access/i,\n  /Cloudflare/i\n];\n\nconst isBlocked = blockedPatterns.some(rx => rx.test(html));\n\nif (isBlocked || !html.trim()) {\n  // Skip this page: return empty IOCs\n  return [{\n    json: {\n      citation_url: url,\n      skipped: true,\n      reason: 'Blocked or empty page',\n      main_content: '',\n      cves: [],\n      ips: [],\n      domains: [],\n      hashes: []\n    }\n  }];\n}\n\n// Clean HTML: remove scripts/styles and tags\nlet cleaned = html.replace(/<script[\\s\\S]*?<\\/script>/gi, '')\n                  .replace(/<style[\\s\\S]*?<\\/style>/gi, '')\n                  .replace(/<\\/?[^>]+(>|$)/g, ' ')\n                  .replace(/\\s+/g, ' ')\n                  .trim();\n\n// Extract CVEs\nconst cves = [...cleaned.matchAll(/CVE-\\d{4}-\\d{4,7}/gi)].map(m => m[0]);\n\n// Extract IPv4 addresses\nconst ips = [...cleaned.matchAll(/\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b/g)].map(m => m[0]);\n\n// Extract domains (basic)\nconst domains = [...cleaned.matchAll(/\\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}\\b/gi)].map(m => m[0]);\n\n// Extract common hashes (MD5, SHA1, SHA256)\n// Match MD5, SHA1, SHA256 (hexadecimal, uppercase or lowercase)\nconst hashes = [...cleaned.matchAll(/(?:\\b|=|:)\\s*([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64})\\b/g)].map(m => m[1]);\n\n\nreturn [{\n  json: {\n    citation_url: url,\n    skipped: false,\n    main_content: cleaned,\n    cves: Array.from(new Set(cves)),\n    ips: Array.from(new Set(ips)),\n    domains: Array.from(new Set(domains)),\n    hashes: Array.from(new Set(hashes))\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        256
+      ],
+      "id": "4ef29a1e-df59-4223-879b-55e5a110c037",
+      "name": "extracting IOC"
+    },
+    {
+      "parameters": {
+        "jsCode": "const iocs = $('Merge IOCs').first().json.combined_iocs;\n\nreturn [\n  { json: { type: \"cve\", value: iocs.cves } },\n  { json: { type: \"ip\", value: iocs.ips } },\n  { json: { type: \"domain\", value: iocs.domains } },\n  { json: { type: \"hash\", value: iocs.hashes } }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        48
+      ],
+      "id": "50506f8b-7657-4af5-a909-acecb39c53cc",
+      "name": "Split IOC Types"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node should run AFTER the loop ends\nconst all = {\n  cves: new Set(),\n  ips: new Set(),\n  domains: new Set(),\n  hashes: new Set(),\n};\n\nfor (const item of items) {\n  if (item.json.skipped) continue; // skip blocked/empty pages\n  (item.json.cves || []).forEach(c => all.cves.add(c));\n  (item.json.ips || []).forEach(i => all.ips.add(i));\n  (item.json.domains || []).forEach(d => all.domains.add(d));\n  (item.json.hashes || []).forEach(h => all.hashes.add(h));\n}\n\nreturn [{\n  json: {\n    combined_iocs: {\n      cves: [...all.cves],\n      ips: [...all.ips],\n      domains: [...all.domains],\n      hashes: [...all.hashes],\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        48
+      ],
+      "id": "c91a7552-2543-466d-a203-b9910d43a537",
+      "name": "Merge IOCs"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a38d1642-93c5-4b0f-9fdd-69007b716594",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "ip",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d956cc77-9ac7-422c-88d9-aabf8124f3ec",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "domain",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "82f576a8-877c-4506-bfad-07141918a9ae",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "hash",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1200,
+        32
+      ],
+      "id": "df3b51ce-507c-439a-a19c-bb21384cdbde",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1440,
+        -272
+      ],
+      "id": "5114c168-e7ff-4c6e-a948-e35563d3b1ed",
+      "name": "Loop over ip(abuse&vt)"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1440,
+        208
+      ],
+      "id": "ef29e010-e91a-4e34-81a0-78ea48fea723",
+      "name": "Loop over hash(VT&HA)"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "value",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -240
+      ],
+      "id": "35854a9e-a993-4871-904b-bbe29648e6ba",
+      "name": "Split ip"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/domains/{{$json.value}}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"x-apikey\": \"YOUR_VIRUSTOTAL_API_KEY\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        0
+      ],
+      "id": "2fbfc3d4-0dff-479b-bcb4-40178b147e94",
+      "name": "VT"
+    },
+    {
+      "parameters": {
+        "jsCode": "function isValidPublicIPv4(ip) {\n  // Basic IPv4 format check\n  if (!/^(?:\\d{1,3}\\.){3}\\d{1,3}$/.test(ip)) return false;\n\n  const parts = ip.split('.').map(Number);\n\n  // Each octet must be 0–255\n  if (!parts.every(p => p >= 0 && p <= 255)) return false;\n\n  // Exclude special/private ranges\n  if (\n    parts[0] === 10 ||                                  // 10.0.0.0/8\n    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || // 172.16.0.0/12\n    (parts[0] === 192 && parts[1] === 168) ||            // 192.168.0.0/16\n    (parts[0] === 169 && parts[1] === 254) ||            // Link-local\n    parts[0] === 127 ||                                  // Loopback\n    ip === '255.255.255.255'                              // Broadcast\n  ) {\n    return false;\n  }\n\n  return true;\n}\n\nreturn items.filter(item => {\n  const v = item.json.value;\n  return v && typeof v === 'string' && isValidPublicIPv4(v.trim());\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1840,
+        -256
+      ],
+      "id": "555d827b-7782-4c0d-8321-6e4c9c59d568",
+      "name": "error check"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Flatten input to an array of domain strings\nconst domains = ($input.all() || []).flatMap(item => item.json.value || []);\n\n// List of common TLDs (can be expanded or use a library in production)\nconst tlds = ['com','org','net','edu','gov','io','co','info','biz','me','us','uk','de','fr','in','ru','cn'];\n\n// Keep only valid public domains\nconst validDomains = domains.filter(d => {\n  if (!d || d.trim() === '') return false;\n  d = d.toLowerCase().trim();\n  const parts = d.split('.');\n  return parts.length >= 2 && tlds.includes(parts[parts.length -1]);\n});\n\n// Skip if nothing valid\nif (validDomains.length === 0) return [];\n\n// Output for looping\nreturn validDomains.map(d => ({ json: { value: d } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        0
+      ],
+      "id": "53d855ae-198e-44d4-a54e-1ad6151e788d",
+      "name": "error check1"
+    },
+    {
+      "parameters": {
+        "jsCode": "if(!$json.value || $json.value.trim() === '') return []; // skips request\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        240
+      ],
+      "id": "8b4e9b4a-42e5-4be4-8e67-878ce19216d5",
+      "name": "error check2"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "value",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        0
+      ],
+      "id": "da3f80bc-e27c-44d9-9446-f7550ccf2446",
+      "name": "Split domain"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "value",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1696,
+        240
+      ],
+      "id": "dd9d30a7-50e0-47d0-b9a9-a63e2e78d411",
+      "name": "Split hash"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/files/{{$json.value}}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"x-apikey\": \"YOUR_VIRUSTOTAL_API_KEY\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2032,
+        224
+      ],
+      "id": "610bf6cd-f407-49df-bef7-bd96a6e5c88c",
+      "name": "VT1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "=https://api.abuseipdb.com/api/v2/check?ipAddress={{$json.value}}&maxAgeInDays=90",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"ipAddress\": \"{{$json.value}}\",\n  \"maxAgeInDays\": \"90\"\n}\n",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Key\": \"YOUR_ABUSEIPDB_API_KEY\",\n  \"Accept\": \"application/json\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        -256
+      ],
+      "id": "a4f7c0f3-081b-438e-98be-9eb3cec3d3ff",
+      "name": "abuseipdb"
+    },
+    {
+      "parameters": {
+        "url": "https://www.hybrid-analysis.com/api/v2/search/hash",
+        "sendQuery": true,
+        "specifyQuery": "json",
+        "jsonQuery": "={\n  \"hash\": \"{{$json.value}}\"\n}\n",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"api-key\": \"YOUR_HYBRID_ANALYSIS_API_KEY\",\n  \"user-agent\": \"Falcon Sandbox\",\n  \"accept\": \"application/json\"\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2032,
+        368
+      ],
+      "id": "8d2c142d-aa93-44c8-961d-153dfae44ca5",
+      "name": "Hybrid Analysis",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "numberInputs": 5
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2400,
+        -48
+      ],
+      "id": "96182715-3dc8-4c8a-ba29-7a22af40d917",
+      "name": "Combine all"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const d = item.json.data || {};\n  const ip = d.ipAddress || item.json.ip || 'N/A';\n  \n  return {\n    json: {\n      ioc: ip,\n      source: \"AbuseIPDB\",\n      ip: ip,\n      abuse_score: d.abuseConfidenceScore || 0,\n      country: d.countryCode || \"N/A\",\n      reports: d.totalReports || 0,\n      usageType: d.usageType || \"N/A\",\n      isPublic: d.isPublic || false,\n      isTor: d.isTor || false\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        -256
+      ],
+      "id": "482b4071-5a98-4f70-a0b0-8ad167628a51",
+      "name": "Cleaned_ip"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    ioc: item.json.value,\n    source: \"VirusTotal-DNS\",\n    vt_result: item.json.data?.attributes?.last_analysis_stats || {},\n    malicious_score: item.json.data?.attributes?.last_analysis_stats?.malicious || 0\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        0
+      ],
+      "id": "a70faacb-421a-415a-9edc-71488937c616",
+      "name": "Cleaned Domains"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Flatten all arrays from multiple runs\nlet all = [];\n\nfor (const item of items) {\n  if (Array.isArray(item.json)) {\n    all.push(...item.json);\n  } else {\n    all.push(item.json);\n  }\n}\n\nreturn [{ json: { combined_data: all } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2608,
+        -48
+      ],
+      "id": "4bc7ab6a-bb0d-40f8-ad47-263a9a298df1",
+      "name": "Flatten merged output"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    ioc: item.json.value,\n    source: \"VirusTotal-Hash\",\n    vt_result: item.json.data?.attributes?.last_analysis_stats || {},\n    malicious_score: item.json.data?.attributes?.last_analysis_stats?.malicious || 0\n  }\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2176,
+        224
+      ],
+      "id": "97bfbab5-c383-4349-9fe6-2dfd641a301b",
+      "name": "Cleaned hashvt"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the flattened array from previous node\nconst combined = items[0].json.combined_data || [];\n\n// Group data by IOC\nconst grouped = {};\n\nfor (const entry of combined) {\n  const ioc = entry.ioc || \"unknown\";\n\n  if (!grouped[ioc]) {\n    grouped[ioc] = {\n      ioc: ioc,\n      sources: {}\n    };\n  }\n\n  // Add source-based enrichment under the IOC\n  const src = entry.source || \"Unknown-Source\";\n\n  grouped[ioc].sources[src] = entry;\n}\n\n// Convert grouped dictionary to an array\nconst results = Object.values(grouped);\n\nreturn results.map(r => ({ json: r }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2768,
+        -48
+      ],
+      "id": "80c200f3-b426-4be6-894b-22aefb3bdac8",
+      "name": "Handle errors"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine all IOCs and their enrichments into a readable summary\nconst data = items.map(i => i.json);\n\nlet report = \"Threat Intelligence Summary Input:\";\n\nfor (const entry of data) {\n  report += `IOC: ${entry.ioc}\\n`;\n\n  for (const [source, details] of Object.entries(entry.sources || {})) {\n    report += `  Source: ${source}\\n  Details: ${JSON.stringify(details, null, 2)}\\n`;\n  }\n\n  report += \"\\n\";\n}\n\n// You can also inject product/version dynamically (if earlier nodes provided them)\nconst product = $('Input validation').first().json.product || \"Unknown Product\";\nconst version = $('Input validation').first().json.version|| \"N/A\";\n\nconst finalPrompt = `\nYou are a threat intelligence analyst.\nFor product: ${product}, version: ${version},\nuse the following enriched IOC details to generate a concise summarized report of findings.\n\n${report}\n`;\n\nreturn [{ json: { prompt: finalPrompt } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2976,
+        -48
+      ],
+      "id": "418629fe-085a-4f34-8848-936e486bc8e0",
+      "name": "Formatting for LLM"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.perplexity.ai/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_PERPLEXITY_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3584,
+        -48
+      ],
+      "id": "290a228d-5f1e-4afb-a8f6-b16515e529ed",
+      "name": "Perplexity Report",
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Avv28ieN8BgXyAGT",
+          "name": "pplx header auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prompt = `\nYou are a threat intelligence analyst.\nFor product: $('Input validation').first().json.product, version: $('Input validation').first().json.version\nuse the following enriched IOC details to generate a concise summarized report of findings.\n\nThreat Intelligence Summary Input:\n${$json.prompt || JSON.stringify($json.combined_results || $json, null, 2)}\n`;\n\nreturn [\n  {\n    json: {\n      model: \"sonar\",\n      messages: [\n        {\n          role: \"system\",\n          content:\n            \"You are a cybersecurity threat intelligence analyst. Summarize and explain the following IOC results in a short, clear threat report.\"\n        },\n        {\n          role: \"user\",\n          content: prompt\n        }\n      ]\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3184,
+        -48
+      ],
+      "id": "f85012e7-3e54-4984-87c7-f8f2757e8c98",
+      "name": "Formatting for LLM2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      model: $json.model,\n      messages: $json.messages\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3392,
+        -48
+      ],
+      "id": "46f2bea6-a836-4517-a4f0-d902d9a82988",
+      "name": "Preview"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and format Perplexity API output for Telegram\nconst data = $json;\nlet report = '';\nlet citations = '';\nlet sources = '';\n\ntry {\n  // Extract main report text\n  report = data.choices?.[0]?.message?.content?.trim() || 'No summary generated.';\n\n  // Format citations (if available)\n  if (data.citations && data.citations.length > 0) {\n    citations = data.citations.map((c, i) => `🔗 [Source ${i + 1}](${c})`).join('\\n');\n  } else {\n    citations = 'No citations found.';\n  }\n\n  // Add visible source list from search results (if any)\n  if (data.search_results && data.search_results.length > 0) {\n    sources = data.search_results\n      .map((r, i) => `[${r.title || 'Untitled Source'}](${r.url})`)\n      .join('\\n');\n  }\n} catch (e) {\n  report = 'Error extracting Perplexity output: ' + e.message;\n}\n\n// Optional: derive a quick \"Threat Level\" guess from report keywords\nlet threatLevel = 'Unknown';\nif (/critical|high|severe/i.test(report)) threatLevel = '🔴 High';\nelse if (/medium|moderate/i.test(report)) threatLevel = '🟠 Medium';\nelse if (/low|minor|benign/i.test(report)) threatLevel = '🟢 Low';\n\nreturn [{\n  json: {\n    text: `*Threat Intelligence Summary*\\n\\n${report}\\n\\n*Threat Level:* ${threatLevel}\\n\\n${citations}\\n\\n${sources}`\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3792,
+        -48
+      ],
+      "id": "b7f041e7-aa3b-44a6-83f0-eedbc74e676e",
+      "name": "Clean up report"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the incoming Telegram message text\nconst text = $json[\"message\"]?.text || \"\";\n\n// Regex to capture product and version\nconst pattern = /analyze latest threat intel on\\s+([\\w-]+)\\s+([\\d.]+)/i;\nconst match = text.match(pattern);\n\nif (!match) {\n  return [{ json: { product: null, version: null, keywords: [], note: \"Invalid format\" } }];\n}\n\n// Define default keywords for threat intel search\nconst keywords = [\"CVE\", \"Vulnerability\", \"Exploit\", \"Threat\", \"Malware\"];\n\n// Return structured object\nreturn [\n  {\n    json: {\n      product: match[1],\n      version: match[2],\n      keywords: keywords\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -80
+      ],
+      "id": "1571a84b-fd5b-46ec-b5f2-5f05abb3b627",
+      "name": "Input validation"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const hash = item.json.sha256s?.[0] || item.json.value || \"unknown\";\n  const reports = item.json.reports || [];\n  const errorMsg = item.json.error?.message || null;\n\n  return {\n    json: {\n      ioc: hash,\n      source: \"HybridAnalysis-Hash\",\n      verdicts: reports.map(r => ({\n        id: r.id || \"N/A\",\n        environment: r.environment_description || \"N/A\",\n        state: r.state || \"N/A\",\n        verdict: r.verdict || \"N/A\"\n      })),\n      report_count: reports.length || 0,\n      error: errorMsg\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        368
+      ],
+      "id": "d2fff6c4-c3d0-4bc9-ba8d-ef577ae9ec0d",
+      "name": "Cleaned hash"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =\n  $input.first().json.text ||\n  'No report generated';\n\n// 1. Remove Markdown bold, headers, emojis\nlet text = raw\n  .replace(/\\*\\*/g, '')          // remove **\n  .replace(/^#+\\s*/gm, '')       // remove # headers\n  .replace(/\\r\\n/g, '\\n');\n\n// 2. Convert Markdown tables to readable text\n// Detect table rows\nconst lines = text.split('\\n');\nlet output = [];\nlet inTable = false;\n\nfor (let line of lines) {\n  if (line.includes('|') && line.includes('---')) {\n    inTable = true;\n    continue;\n  }\n\n  if (line.includes('|') && inTable) {\n    const cols = line.split('|').map(c => c.trim()).filter(Boolean);\n\n    if (cols.length >= 3) {\n      output.push(\n        `• ${cols[0]} | ${cols[1]} | Severity: ${cols[2]} | Updated: ${cols[3] || 'N/A'}`\n      );\n    }\n    continue;\n  }\n\n  if (inTable && !line.includes('|')) {\n    inTable = false;\n  }\n\n  output.push(line);\n}\n\ntext = output.join('\\n');\n\n// 3. Improve section spacing\ntext = text\n  .replace(/Threat Intelligence Summary/gi, '\\nTHREAT INTELLIGENCE SUMMARY\\n')\n  .replace(/Key Vulnerabilities/gi, '\\nKEY VULNERABILITIES\\n')\n  .replace(/Recommendations/gi, '\\nRECOMMENDATIONS\\n')\n  .replace(/Threat Level:/gi, '\\nTHREAT LEVEL:');\n\n// 4. Clean excessive newlines\ntext = text.replace(/\\n{3,}/g, '\\n\\n').trim();\n\n// 5. Telegram message length safety\nconst MAX = 4000;\nif (text.length > MAX) {\n  text = text.slice(0, MAX) + '\\n\\n[Truncated]';\n}\n\nreturn [\n  {\n    json: {\n      telegram_report: text\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4000,
+        -48
+      ],
+      "id": "e37f2b44-c463-48c6-9d41-c63a0465e226",
+      "name": "Report formatting"
+    }
+  ],
+  "pinData": {
+    "Pplx intel source": [
+      {
+        "json": {
+          "id": "bdbe859b-fa9f-4063-a971-e7d5de35c3bc",
+          "model": "sonar",
+          "created": 1767458301,
+          "usage": {
+            "prompt_tokens": 29,
+            "completion_tokens": 500,
+            "total_tokens": 529,
+            "search_context_size": "low",
+            "cost": {
+              "input_tokens_cost": 0,
+              "output_tokens_cost": 0.001,
+              "request_cost": 0.005,
+              "total_cost": 0.006
+            }
+          },
+          "citations": [
+            "https://industrialcyber.co/cisa/cisa-nsa-partners-publish-microsoft-exchange-server-hardening-guide-to-prevent-compromise-and-data-theft/",
+            "https://www.microsoft.com/en-us/security/blog/2025/04/09/stopping-attacks-against-on-premises-exchange-server-and-sharepoint-server-with-amsi/",
+            "https://www.kaspersky.com/blog/exchange-se-hardening-2026/54835/",
+            "https://fieldeffect.com/blog/microsoft-exchange-flaw-cloud-takeover-hybrid",
+            "https://techcommunity.microsoft.com/blog/exchange/released-october-2025-exchange-server-security-updates/4461276",
+            "https://quorumcyber.com/threat-intelligence/active-scanning-for-vulnerable-microsoft-exchange-servers-proxyshell/",
+            "https://www.helpnetsecurity.com/2025/10/31/microsoft-exchange-on-premises-security/",
+            "https://www.darkreading.com/cyber-risk/microsoft-exchange-under-imminent-threat-act-now",
+            "https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-ews-exchange-online"
+          ],
+          "search_results": [
+            {
+              "title": "CISA, NSA, partners publish Microsoft Exchange server hardening ...",
+              "url": "https://industrialcyber.co/cisa/cisa-nsa-partners-publish-microsoft-exchange-server-hardening-guide-to-prevent-compromise-and-data-theft/",
+              "date": "2025-10-31",
+              "last_updated": "2026-01-03",
+              "snippet": "Organizations with unprotected or misconfigured Microsoft Exchange servers remain at high risk of compromise as threat activity targeting ...",
+              "source": "web"
+            },
+            {
+              "title": "Stopping attacks against on-premises Exchange Server ... - Microsoft",
+              "url": "https://www.microsoft.com/en-us/security/blog/2025/04/09/stopping-attacks-against-on-premises-exchange-server-and-sharepoint-server-with-amsi/",
+              "date": "2025-04-09",
+              "last_updated": "2025-12-31",
+              "snippet": "In this blog post, we discuss different types of attacks targeting Exchange and SharePoint, and demonstrate how AMSI is helping organizations protect against ...",
+              "source": "web"
+            },
+            {
+              "title": "Microsoft Exchange on-premises hardening recommendations",
+              "url": "https://www.kaspersky.com/blog/exchange-se-hardening-2026/54835/",
+              "date": "2025-11-26",
+              "last_updated": "2025-12-30",
+              "snippet": "A holistic approach to securing Exchange servers beyond Exchange 2016 and 2019 end-of-life.",
+              "source": "web"
+            },
+            {
+              "title": "Microsoft Exchange flaw could enable cloud takeover in hybrid ...",
+              "url": "https://fieldeffect.com/blog/microsoft-exchange-flaw-cloud-takeover-hybrid",
+              "date": "2025-08-08",
+              "last_updated": "2025-12-23",
+              "snippet": "New Microsoft Exchange flaw (CVE-2025-53786) could let attackers hijack cloud in hybrid setups. Learn how to mitigate and secure your ...",
+              "source": "web"
+            },
+            {
+              "title": "Released: October 2025 Exchange Server Security Updates",
+              "url": "https://techcommunity.microsoft.com/blog/exchange/released-october-2025-exchange-server-security-updates/4461276",
+              "date": "2025-10-14",
+              "last_updated": "2025-12-16",
+              "snippet": "We have released Security Updates for Exchange Server SE, Exchange Server 2019 and Exchange Server 2016.",
+              "source": "web"
+            },
+            {
+              "title": "Active Scanning for Vulnerable Exchange servers (ProxyShell)",
+              "url": "https://quorumcyber.com/threat-intelligence/active-scanning-for-vulnerable-microsoft-exchange-servers-proxyshell/",
+              "date": "2022-10-28",
+              "last_updated": "2026-01-03",
+              "snippet": "Current estimates point to around 400,000 vulnerable machines exposed to the Internet. Exchange Server 2013 up to CU23; Exchange Server 2016 up to CU20 ...",
+              "source": "web"
+            },
+            {
+              "title": "CISA and partners take action as Microsoft Exchange security risks ...",
+              "url": "https://www.helpnetsecurity.com/2025/10/31/microsoft-exchange-on-premises-security/",
+              "date": "2025-10-31",
+              "last_updated": "2025-12-24",
+              "snippet": "CISA and the NSA have outlined security best practices for organizations that use on-premises versions of Microsoft Exchange Server.",
+              "source": "web"
+            },
+            {
+              "title": "Microsoft Exchange 'Under Imminent Threat', Act Now - Dark Reading",
+              "url": "https://www.darkreading.com/cyber-risk/microsoft-exchange-under-imminent-threat-act-now",
+              "date": "2025-11-12",
+              "snippet": "Threats against Microsoft Exchange continue to mount, but there are steps both organizations and Microsoft can take to limit them.",
+              "source": "web"
+            },
+            {
+              "title": "Deprecation of Exchange Web Services in Exchange Online",
+              "url": "https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-ews-exchange-online",
+              "date": "2025-11-18",
+              "last_updated": "2025-11-20",
+              "snippet": "Remove EWS dependencies from Microsoft applications. October 2026: EWS disabled globally for all organizations. Call To Action. Don't wait for ...",
+              "source": "web"
+            }
+          ],
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "**Exchange Server 2019 reached end-of-life in October 2025, with the October 2025 Security Updates (SUs) as the last publicly available patches; organizations must migrate to Exchange Server Subscription Edition (SE) or purchase Extended Security Updates (ESU) through April 2026 to receive further critical/important fixes.[5][7]**\n\n### Key Vulnerabilities (CVEs)\n- **CVE-2025-53786** (CVSS 8.0): High-severity privilege escalation flaw in hybrid deployments, allowing attackers to hijack on-premises Exchange (including 2019) to control Exchange Online. Disclosed August 6, 2025; affects Exchange Server 2016, 2019, and SE. Mitigate via patching and hybrid configuration hardening.[4]\n\nOlder vulnerabilities like **ProxyShell** (affecting Exchange 2019 up to CU9) remain a scanning target, enabling unauthenticated plaintext password theft and arbitrary code execution via port 443; ~400,000 vulnerable servers were estimated exposed as of recent scans.[6] October 2025 SUs address undisclosed vulnerabilities responsibly reported to Microsoft, with no known in-the-wild exploits at release.[5]\n\n### Active Threats and Exploits\nThreat actors target unpatched or misconfigured Exchange 2019 servers via:\n- Web shell deployment in Outlook Web App (OWA) directories (e.g., OAB virtual directory).[2]\n- Malicious IIS worker processes dropping web shells.[2]\n- NTLM relay and Adversary-in-the-Middle attacks, countered by Extended Protection (enabled by default in Exchange 2019 CU14).[3]\n- Mail flow rule injection via Exchange Web Services (EWS) for email theft; password spraying, spearphishing, and token hijacking.[3]\n- Active scanning for ProxyShell-vulnerable servers.[6]\n\nCISA/NSA warn of high compromise risk for unprotected servers, urging immediate hardening.[1][7][8]\n\n### Malware and IOCs\n- **Web shells**: Common in OWA; detected via AMSI scanning of request bodies (enabled in Exchange November 2024 SU and later).[2]\n- **MailSniper activity**: PowerShell-based reconnaissance/exfiltration tool targeting Exchange.[2]\nNo specific new IOCs (e.g., hashes, IPs) listed in recent intel; focus on behavioral detections like suspicious OWA requests"
+              },
+              "delta": {
+                "role": "assistant",
+                "content": ""
+              },
+              "finish_reason": "length"
+            }
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Combine all": [
+      {
+        "json": {
+          "type": "cve",
+          "value": [
+            "CVE-2023-29357",
+            "CVE-2023-24955",
+            "CVE-2022-41040",
+            "CVE-2023-23397",
+            "CVE-2024-38094",
+            "CVE-2024-38024",
+            "CVE-2024-38023",
+            "CVE-2021-34473",
+            "CVE-2021-34523",
+            "CVE-2021-31207",
+            "CVE-2022-41082",
+            "CVE-2019-0604",
+            "CVE-2024-21413",
+            "CVE-2023-36563",
+            "CVE-2025-55182",
+            "CVE-2025-66478"
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "type": "ip",
+          "value": []
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "type": "domain",
+          "value": [
+            "signout.aspx",
+            "Process.Start",
+            "Assembly.load",
+            "BDCMetadata.bdcm",
+            "net.exe",
+            "cmd.exe",
+            "powershell.exe",
+            "w3wp.exe",
+            "csc.exe",
+            "cvtres.exe",
+            "conhost.exe",
+            "OleConverter.exe",
+            "wermgr.exe",
+            "WerFault.exe",
+            "TranscodingService.exe",
+            "aka.ms",
+            "www.linkedin.com",
+            "x.com",
+            "thecyberwire.com"
+          ]
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      },
+      {
+        "json": {
+          "type": "hash",
+          "value": []
+        },
+        "pairedItem": {
+          "item": 3
+        }
+      },
+      {
+        "json": {
+          "source": "VirusTotal-DNS",
+          "vt_result": {
+            "malicious": 0,
+            "suspicious": 0,
+            "undetected": 29,
+            "harmless": 66,
+            "timeout": 0
+          },
+          "malicious_score": 0
+        },
+        "pairedItem": {
+          "item": 0,
+          "input": 2
+        }
+      },
+      {
+        "json": {
+          "source": "VirusTotal-DNS",
+          "vt_result": {
+            "malicious": 0,
+            "suspicious": 0,
+            "undetected": 28,
+            "harmless": 67,
+            "timeout": 0
+          },
+          "malicious_score": 0
+        },
+        "pairedItem": {
+          "item": 1,
+          "input": 2
+        }
+      },
+      {
+        "json": {
+          "source": "VirusTotal-DNS",
+          "vt_result": {
+            "malicious": 0,
+            "suspicious": 0,
+            "undetected": 31,
+            "harmless": 64,
+            "timeout": 0
+          },
+          "malicious_score": 0
+        },
+        "pairedItem": {
+          "item": 2,
+          "input": 2
+        }
+      }
+    ],
+    "Telegram Trigger": [
+      {
+        "json": {
+          "update_id": 123456789,
+          "message": {
+            "message_id": 1,
+            "from": {
+              "id": 111111111,
+              "is_bot": false,
+              "first_name": "TestUser",
+              "language_code": "en"
+            },
+            "chat": {
+              "id": 111111111,
+              "first_name": "TestUser",
+              "type": "private"
+            },
+            "date": 1730000000,
+            "text": "analyze latest threat intel on Microsoft Exchange Server 2019"
+          }
+        }
+      }
+    ],
+    "Input validation": [
+      {
+        "json": {
+          "product": "Microsoft Exchange Server ",
+          "version": "2019",
+          "keywords": [
+            "CVE",
+            "Vulnerability",
+            "Exploit",
+            "Threat",
+            "Malware"
+          ]
+        }
+      }
+    ],
+    "Perplexity Report": [
+      {
+        "json": {
+          "id": "9b20c48b-76ef-4990-ae14-fd0864eadf8d",
+          "model": "sonar",
+          "created": 1767462459,
+          "usage": {
+            "prompt_tokens": 228,
+            "completion_tokens": 633,
+            "total_tokens": 861,
+            "search_context_size": "low",
+            "cost": {
+              "input_tokens_cost": 0,
+              "output_tokens_cost": 0.001,
+              "request_cost": 0.005,
+              "total_cost": 0.006
+            }
+          },
+          "citations": [
+            "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-august-12-2025-kb5063221-02a94d29-c2c3-4733-9eb4-66223ff0c355",
+            "https://www.cvedetails.com/version/637177/Microsoft-Exchange-Server-2019.html",
+            "https://www.manageengine.com/vulnerability-management/vulnerability-database/Microsoft-Exchange-Server-2019-vulnerabilities.html",
+            "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-june-13-2023-kb5026261-c4abbd97-5afe-4229-9ecf-a0b7c0002a5d",
+            "https://www.messageware.com/microsoft-exchange-server-vulnerabilities-cve/",
+            "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-cu15-december-9-2025-kb5071875-5b597d17-e1af-4a4c-a2cc-3238ee734b89",
+            "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-cu15-october-14-2025-kb5066367-19a1091c-e0b3-4078-be6b-312463063d05",
+            "https://support.microsoft.com/en-us/topic/description-of-security-update-1-for-exchange-server-2019-march-12-2024-kb5036401-9160baeb-6306-4384-a5c9-94b0a18cba8e"
+          ],
+          "search_results": [
+            {
+              "title": "Description of the security update for Microsoft Exchange Server 2019",
+              "url": "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-august-12-2025-kb5063221-02a94d29-c2c3-4733-9eb4-66223ff0c355",
+              "date": "2025-07-06",
+              "last_updated": "2025-12-19",
+              "snippet": "CVE-2025-25005 - Microsoft Exchange Server Tampering Vulnerability · CVE-2025-25006 - Microsoft Exchange Server Spoofing Vulnerability · CVE-2025-25007 - ...",
+              "source": "web"
+            },
+            {
+              "title": "Microsoft Exchange Server 2019 security vulnerabilities, CVEs",
+              "url": "https://www.cvedetails.com/version/637177/Microsoft-Exchange-Server-2019.html",
+              "date": "2024-09-18",
+              "last_updated": "2025-03-27",
+              "snippet": "This page lists vulnerability statistics for CVEs published in the last ten years, if any, for Microsoft » Exchange Server » 2019 cumulative_update_9 .",
+              "source": "web"
+            },
+            {
+              "title": "Microsoft-Exchange-Server-2019 - ManageEngine",
+              "url": "https://www.manageengine.com/vulnerability-management/vulnerability-database/Microsoft-Exchange-Server-2019-vulnerabilities.html",
+              "date": "2025-10-17",
+              "last_updated": "2025-12-12",
+              "snippet": "This webpage is intended to provide you information about vulnerability announcement for certain specific software products.",
+              "source": "web"
+            },
+            {
+              "title": "Description of the security update for Microsoft Exchange Server 2019",
+              "url": "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-june-13-2023-kb5026261-c4abbd97-5afe-4229-9ecf-a0b7c0002a5d",
+              "date": "2023-05-17",
+              "last_updated": "2025-10-10",
+              "snippet": "This security update rollup resolves vulnerabilities in Microsoft Exchange Server. To learn more about these vulnerabilities, see the following Common ...",
+              "source": "web"
+            },
+            {
+              "title": "Microsoft Exchange Server Security Vulnerabilities, CVE",
+              "url": "https://www.messageware.com/microsoft-exchange-server-vulnerabilities-cve/",
+              "date": "2025-06-17",
+              "last_updated": "2025-07-18",
+              "snippet": "A high-severity spoofing vulnerability in Microsoft Exchange Server 2013, 2016, and 2019 that allows attackers to impersonate users or services, ...",
+              "source": "web"
+            },
+            {
+              "title": "Description of the security update for Microsoft Exchange Server ...",
+              "url": "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-cu15-december-9-2025-kb5071875-5b597d17-e1af-4a4c-a2cc-3238ee734b89",
+              "date": "2025-12-09",
+              "last_updated": "2025-12-20",
+              "snippet": "Original article content. This security update resolves vulnerabilities in Microsoft Exchange Server. To learn more about these vulnerabilities ...",
+              "source": "web"
+            },
+            {
+              "title": "Description of the security update for Microsoft Exchange Server ...",
+              "url": "https://support.microsoft.com/en-us/topic/description-of-the-security-update-for-microsoft-exchange-server-2019-cu15-october-14-2025-kb5066367-19a1091c-e0b3-4078-be6b-312463063d05",
+              "date": "2025-10-14",
+              "last_updated": "2025-10-28",
+              "snippet": "Original article content. This security update rollup resolves vulnerabilities in Microsoft Exchange Server. To learn more about these ...",
+              "source": "web"
+            },
+            {
+              "title": "Description of Security Update 1 for Exchange Server 2019",
+              "url": "https://support.microsoft.com/en-us/topic/description-of-security-update-1-for-exchange-server-2019-march-12-2024-kb5036401-9160baeb-6306-4384-a5c9-94b0a18cba8e",
+              "date": "2024-02-26",
+              "last_updated": "2025-10-24",
+              "snippet": "This security update rollup resolves vulnerabilities in Microsoft Exchange Server. To learn more about these vulnerabilities, see the following Common ...",
+              "source": "web"
+            }
+          ],
+          "object": "chat.completion",
+          "choices": [
+            {
+              "index": 0,
+              "message": {
+                "role": "assistant",
+                "content": "# Microsoft Exchange Server 2019 Threat Intelligence Report\n\n## Product Summary\n- **Product**: Microsoft Exchange Server 2019\n- **Version**: 2019 (specific CU not indicated)\n- **IOC Analysis**: No actionable indicators of compromise detected. Hash IOC is empty (\"value\": [] from Unknown-Source). VirusTotal-DNS scan shows **0 malicious** or suspicious detections (31 undetected, 64 harmless, malicious score: 0).[input]\n\n## Key Vulnerabilities\nMicrosoft Exchange Server 2019 has multiple actively patched vulnerabilities, primarily **tampering**, **spoofing**, **elevation of privilege (EoP)**, **remote code execution (RCE)**, and **information disclosure**. Recent 2025 updates address critical issues:\n\n| CVE ID | Type | Severity | Patch KB | Date |\n|--------|------|----------|----------|------|\n| **CVE-2025-25005** | Tampering | Not specified | KB5063221 | Aug 2025[1] |\n| **CVE-2025-25006** | Spoofing | Not specified | KB5063221 | Aug 2025[1] |\n| **CVE-2025-25007** | Tampering | Not specified | KB5063221 | Aug 2025[1] |\n| **CVE-2025-33051** | Information Disclosure | Not specified | KB5063221 | Aug 2025[1] |\n| **CVE-2025-64666** | EoP | Not specified | KB5071875 (CU15) | Dec 2025[6] |\n| **CVE-2025-64667** | Spoofing | Not specified | KB5071875 (CU15) | Dec 2025[6] |\n| **CVE-2025-59249** | EoP | Not specified | KB5066367 (CU15) | Oct 2025[7] |\n| **CVE-2025-53782** | EoP | Not specified | KB5066367 (CU15) | Oct 2025[7] |\n| **CVE-2025-59248** | Spoofing | Not specified | KB5066367 (CU15) | Oct 2025[7] |\n\nOlder critical issues include ProxyLogon chain (CVE-2021-26855, -26858; SSRF/RCE, CVSS 9.8, widely exploited).[5]\n\n## Risk Assessment\n- **No active IOCs**: Environment appears clean based on provided data.\n- **Patch Priority**: Apply latest Cumulative Updates (e.g., CU15 with KB5071875/KB5066367) to mitigate 2025 CVEs. Unpatched systems vulnerable to spoofing/EoP leading to RCE.[1][6][7]\n- **Recommendations**: Verify patch level (e.g., Exchmem.dll version ≥15.2.1748.36), enable Extended Protection, monitor for MSRC indicators.[1][4]"
+              },
+              "delta": {
+                "role": "assistant",
+                "content": ""
+              },
+              "finish_reason": "stop"
+            }
+          ]
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Input validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop OTX Search": {
+      "main": [
+        []
+      ]
+    },
+    "Keyword split": {
+      "main": [
+        []
+      ]
+    },
+    "CISA": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Keyword split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pplx intel source": {
+      "main": [
+        [
+          {
+            "node": "llm intel func",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "llm intel func": {
+      "main": [
+        [
+          {
+            "node": "source loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "source loop": {
+      "main": [
+        [
+          {
+            "node": "Merge IOCs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "URL Data fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "URL Data fetch": {
+      "main": [
+        [
+          {
+            "node": "extracting IOC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extracting IOC": {
+      "main": [
+        [
+          {
+            "node": "source loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge IOCs": {
+      "main": [
+        [
+          {
+            "node": "Split IOC Types",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split IOC Types": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Combine all",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Loop over ip(abuse&vt)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Split domain",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop over hash(VT&HA)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over hash(VT&HA)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Split hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over ip(abuse&vt)": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Split ip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split ip": {
+      "main": [
+        [
+          {
+            "node": "error check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "error check": {
+      "main": [
+        [
+          {
+            "node": "abuseipdb",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "error check1": {
+      "main": [
+        [
+          {
+            "node": "VT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split domain": {
+      "main": [
+        [
+          {
+            "node": "error check1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split hash": {
+      "main": [
+        [
+          {
+            "node": "error check2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "error check2": {
+      "main": [
+        [
+          {
+            "node": "VT1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Hybrid Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VT": {
+      "main": [
+        [
+          {
+            "node": "Cleaned Domains",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VT1": {
+      "main": [
+        [
+          {
+            "node": "Cleaned hashvt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "abuseipdb": {
+      "main": [
+        [
+          {
+            "node": "Cleaned_ip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hybrid Analysis": {
+      "main": [
+        [
+          {
+            "node": "Cleaned hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine all": {
+      "main": [
+        [
+          {
+            "node": "Flatten merged output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaned_ip": {
+      "main": [
+        [
+          {
+            "node": "Combine all",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Cleaned Domains": {
+      "main": [
+        [
+          {
+            "node": "Combine all",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Flatten merged output": {
+      "main": [
+        [
+          {
+            "node": "Handle errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaned hashvt": {
+      "main": [
+        [
+          {
+            "node": "Combine all",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Handle errors": {
+      "main": [
+        [
+          {
+            "node": "Formatting for LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatting for LLM": {
+      "main": [
+        [
+          {
+            "node": "Formatting for LLM2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Perplexity Report": {
+      "main": [
+        [
+          {
+            "node": "Clean up report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatting for LLM2": {
+      "main": [
+        [
+          {
+            "node": "Preview",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preview": {
+      "main": [
+        [
+          {
+            "node": "Perplexity Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean up report": {
+      "main": [
+        [
+          {
+            "node": "Report formatting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply to Telegram": {
+      "main": [
+        []
+      ]
+    },
+    "Input validation": {
+      "main": [
+        [
+          {
+            "node": "Pplx intel source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cleaned hash": {
+      "main": [
+        [
+          {
+            "node": "Combine all",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Report formatting": {
+      "main": [
+        [
+          {
+            "node": "Reply to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "73c04e85-5147-46c1-9531-d90bddc8ed23",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4d2ea8b4b2706c36befc7f357d28c7fa4f3925259b6bc77ab3947d508fced7fa"
+  },
+  "id": "qYI78jTedDmPd1tT",
+  "tags": []
+}
