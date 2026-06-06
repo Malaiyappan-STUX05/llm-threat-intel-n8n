@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d1117"/>
+      <stop offset="100%" stop-color="#161b22"/>
+    </linearGradient>
+    <filter id="glow">
+      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#58a6ff" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="720" fill="url(#bg)" rx="12"/>
+
+  <!-- Title -->
+  <text x="500" y="36" text-anchor="middle" fill="#58a6ff" font-size="20" font-weight="700">Threat Intelligence Pipeline</text>
+  <text x="500" y="58" text-anchor="middle" fill="#8b949e" font-size="12">Automated multi-source vulnerability correlation &amp; IOC enrichment engine</text>
+
+  <!-- ===== STAGE 1: INPUT ===== -->
+  <rect x="20" y="80" width="80" height="70" rx="8" fill="#161b22" stroke="#238636" stroke-width="1.5"/>
+  <text x="60" y="110" text-anchor="middle" fill="#3fb950" font-size="10" font-weight="600">STAGE</text>
+  <text x="60" y="126" text-anchor="middle" fill="#3fb950" font-size="14" font-weight="700">01</text>
+  <text x="60" y="142" text-anchor="middle" fill="#8b949e" font-size="9">INPUT</text>
+
+  <rect x="115" y="85" width="860" height="60" rx="8" fill="#161b22" stroke="#238636" stroke-width="1.5"/>
+  <text x="135" y="108" fill="#3fb950" font-size="13" font-weight="600">📨 Telegram Trigger</text>
+  <text x="135" y="128" fill="#8b949e" font-size="11">Receives natural language query → Regex extraction of product name &amp; version → Structured JSON output</text>
+
+  <!-- Arrow -->
+  <line x1="500" y1="155" x2="500" y2="175" stroke="#30363d" stroke-width="2"/>
+  <polygon points="495,175 500,185 505,175" fill="#30363d"/>
+
+  <!-- ===== STAGE 2: RESEARCH ===== -->
+  <rect x="20" y="190" width="80" height="100" rx="8" fill="#161b22" stroke="#8957e5" stroke-width="1.5"/>
+  <text x="60" y="220" text-anchor="middle" fill="#bc8cff" font-size="10" font-weight="600">STAGE</text>
+  <text x="60" y="236" text-anchor="middle" fill="#bc8cff" font-size="14" font-weight="700">02</text>
+  <text x="60" y="252" text-anchor="middle" fill="#8b949e" font-size="9">RESEARCH</text>
+
+  <rect x="115" y="195" width="270" height="90" rx="8" fill="#161b22" stroke="#8957e5" stroke-width="1.5"/>
+  <text x="130" y="218" fill="#bc8cff" font-size="12" font-weight="600">🛡️ CISA KEV</text>
+  <text x="130" y="236" fill="#8b949e" font-size="10">Known Exploited Vulnerabilities</text>
+  <text x="130" y="252" fill="#8b949e" font-size="10">feed filtered by product &amp; version</text>
+
+  <rect x="395" y="195" width="270" height="90" rx="8" fill="#161b22" stroke="#8957e5" stroke-width="1.5"/>
+  <text x="410" y="218" fill="#bc8cff" font-size="12" font-weight="600">🌐 AlienVault OTX</text>
+  <text x="410" y="236" fill="#8b949e" font-size="10">Threat intelligence pulse search</text>
+  <text x="410" y="252" fill="#8b949e" font-size="10">across multiple keywords</text>
+
+  <rect x="675" y="195" width="300" height="90" rx="8" fill="#161b22" stroke="#39c5cf" stroke-width="1.5"/>
+  <text x="690" y="218" fill="#39c5cf" font-size="12" font-weight="600">🤖 Perplexity AI</text>
+  <text x="690" y="236" fill="#8b949e" font-size="10">LLM-powered threat context analysis</text>
+  <text x="690" y="252" fill="#8b949e" font-size="10">+ citation URLs for deep research</text>
+
+  <!-- Arrow -->
+  <line x1="500" y1="295" x2="500" y2="315" stroke="#30363d" stroke-width="2"/>
+  <polygon points="495,315 500,325 505,315" fill="#30363d"/>
+
+  <!-- ===== STAGE 3: EXTRACT ===== -->
+  <rect x="20" y="330" width="80" height="70" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+  <text x="60" y="360" text-anchor="middle" fill="#d29922" font-size="10" font-weight="600">STAGE</text>
+  <text x="60" y="376" text-anchor="middle" fill="#d29922" font-size="14" font-weight="700">03</text>
+  <text x="60" y="392" text-anchor="middle" fill="#8b949e" font-size="9">EXTRACT</text>
+
+  <rect x="115" y="335" width="860" height="60" rx="8" fill="#161b22" stroke="#d29922" stroke-width="1.5"/>
+  <text x="135" y="358" fill="#d29922" font-size="13" font-weight="600">🔍 IOC Extraction Engine</text>
+  <text x="135" y="378" fill="#8b949e" font-size="11">Scrapes citation URLs → Regex extraction of CVEs, IPs, domains, file hashes (MD5/SHA1/SHA256) → Deduplication</text>
+
+  <!-- Arrow -->
+  <line x1="500" y1="405" x2="500" y2="425" stroke="#30363d" stroke-width="2"/>
+  <polygon points="495,425 500,435 505,425" fill="#30363d"/>
+
+  <!-- ===== STAGE 4: ENRICH ===== -->
+  <rect x="20" y="440" width="80" height="100" rx="8" fill="#161b22" stroke="#da3633" stroke-width="1.5"/>
+  <text x="60" y="470" text-anchor="middle" fill="#f85149" font-size="10" font-weight="600">STAGE</text>
+  <text x="60" y="486" text-anchor="middle" fill="#f85149" font-size="14" font-weight="700">04</text>
+  <text x="60" y="502" text-anchor="middle" fill="#8b949e" font-size="9">ENRICH</text>
+
+  <rect x="115" y="445" width="270" height="90" rx="8" fill="#161b22" stroke="#da3633" stroke-width="1.5"/>
+  <text x="130" y="468" fill="#f85149" font-size="12" font-weight="600">🎯 AbuseIPDB</text>
+  <text x="130" y="486" fill="#8b949e" font-size="10">IP reputation scoring &amp; abuse</text>
+  <text x="130" y="502" fill="#8b949e" font-size="10">confidence rating</text>
+
+  <rect x="395" y="445" width="270" height="90" rx="8" fill="#161b22" stroke="#da3633" stroke-width="1.5"/>
+  <text x="410" y="468" fill="#f85149" font-size="12" font-weight="600">🦠 VirusTotal</text>
+  <text x="410" y="486" fill="#8b949e" font-size="10">Domain &amp; file hash reputation</text>
+  <text x="410" y="502" fill="#8b949e" font-size="10">with detection ratios</text>
+
+  <rect x="675" y="445" width="300" height="90" rx="8" fill="#161b22" stroke="#da3633" stroke-width="1.5"/>
+  <text x="690" y="468" fill="#f85149" font-size="12" font-weight="600">🔬 Hybrid Analysis</text>
+  <text x="690" y="486" fill="#8b949e" font-size="10">Malware sandbox verdicts &amp;</text>
+  <text x="690" y="502" fill="#8b949e" font-size="10">behavioral analysis reports</text>
+
+  <!-- Arrow -->
+  <line x1="500" y1="545" x2="500" y2="565" stroke="#30363d" stroke-width="2"/>
+  <polygon points="495,565 500,575 505,565" fill="#30363d"/>
+
+  <!-- ===== STAGE 5: CORRELATE ===== -->
+  <rect x="20" y="580" width="80" height="70" rx="8" fill="#161b22" stroke="#e3b341" stroke-width="1.5"/>
+  <text x="60" y="610" text-anchor="middle" fill="#e3b341" font-size="10" font-weight="600">STAGE</text>
+  <text x="60" y="626" text-anchor="middle" fill="#e3b341" font-size="14" font-weight="700">05</text>
+  <text x="60" y="642" text-anchor="middle" fill="#8b949e" font-size="9">CORRELATE</text>
+
+  <rect x="115" y="585" width="860" height="50" rx="8" fill="#161b22" stroke="#e3b341" stroke-width="1.5"/>
+  <text x="135" y="608" fill="#e3b341" font-size="13" font-weight="600">🔗 Multi-Source Correlation Engine</text>
+  <text x="135" y="626" fill="#8b949e" font-size="11">Merges all IOCs → Groups by indicator → Attaches enrichment data from each source</text>
+
+  <!-- Footer -->
+  <text x="500" y="700" text-anchor="middle" fill="#484f58" font-size="11">40-node n8n workflow • 6 threat intelligence sources • End-to-end automation</text>
+</svg>

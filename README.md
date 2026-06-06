@@ -1,75 +1,67 @@
 # 🧠 LLM-Enhanced Threat Intelligence Correlation Automation
 
-> **Final Year B.Tech Project** — Malaiyappan S (RA2211030010001)  
-> SRM Institute of Science and Technology, Cybersecurity
+<div align="center">
 
-An **n8n-powered automated threat intelligence pipeline** that correlates vulnerability data from multiple sources (CISA KEV, AlienVault OTX, Perplexity AI, VirusTotal, AbuseIPDB, Hybrid Analysis) and delivers actionable threat reports via **Telegram**.
+[![n8n](https://img.shields.io/badge/n8n-FF6D5A?style=for-the-badge&logo=n8n&logoColor=white)](https://n8n.io)
+[![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
+[![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://telegram.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+**Automated multi-source vulnerability correlation &amp; IOC enrichment engine**
+
+*40-node n8n workflow • 6 threat intelligence sources • End-to-end automation*
+
+[Getting Started](#-getting-started) • [Architecture](#-architecture) • [Configuration](#-configuration) • [Data Flow](#-data-flow)
+
+</div>
 
 ---
 
 ## 🎯 What It Does
 
-Send a single Telegram message like:
+<div align="right">
+  <img src="assets/images/sample-output.svg" alt="Sample Telegram Output" width="280"/>
+</div>
+
+Send a single Telegram message:
 
 ```
 analyze latest threat intel on Microsoft Exchange Server 2019
 ```
 
-And get back a **comprehensive threat intelligence report** covering:
+Get back a **comprehensive threat intelligence report** in under 60 seconds:
 
-- ✅ **CVEs & Known Vulnerabilities** — from CISA KEV & AlienVault OTX
-- ✅ **Threat Context & Analysis** — AI-summarized via Perplexity Sonar
-- ✅ **IOC Extraction** — CVEs, IPs, domains, hashes from threat sources
-- ✅ **IOC Enrichment** — VirusTotal, AbuseIPDB, Hybrid Analysis lookups
-- ✅ **Risk Assessment** — Threat level scoring with recommendations
-- ✅ **Formatted Telegram Report** — Clean, readable Markdown output
+| Section | Details |
+|---------|---------|
+| **CVEs & Vulnerabilities** | Known exploited vulnerabilities from CISA KEV &amp; AlienVault OTX |
+| **Threat Context** | AI-summarized analysis of active threats, exploits, and TTPs |
+| **IOC Indicators** | Extracted CVEs, IPs, domains, and file hashes from threat sources |
+| **Enrichment Data** | Reputation scores from VirusTotal, AbuseIPDB, and Hybrid Analysis |
+| **Risk Assessment** | Threat level scoring with prioritized recommendations |
+| **Source Citations** | Direct links to all referenced threat intelligence reports |
 
 ---
 
 ## 🏗️ Architecture
 
-```
-┌──────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-│   Telegram    │────▶│  Input Validation │────▶│  Perplexity AI      │
-│   Trigger     │     │  (Parse product   │     │  (Threat Context)   │
-│              │     │   & version)      │     └──────────┬──────────┘
-└──────────────┘     └────────┬─────────┘                │
-                              │                          ▼
-                              │                 ┌─────────────────────┐
-                              │                 │  IOC Extraction     │
-                              │                 │  (Scrape citations, │
-                              │                 │   extract CVEs,     │
-                              │                 │   IPs, domains,     │
-                              │                 │   hashes)           │
-                              │                 └──────────┬──────────┘
-                              │                          │
-                              ▼                          ▼
-                     ┌─────────────────┐      ┌─────────────────────┐
-                     │  CISA KEV       │      │  IOC Enrichment     │
-                     │  + OTX Search   │      │  ┌───────────────┐  │
-                     │  (Vulnerability │      │  │ AbuseIPDB     │  │
-                     │   Correlation)  │      │  │ VirusTotal    │  │
-                     └────────┬────────┘      │  │ Hybrid Analysis│  │
-                              │               │  └───────────────┘  │
-                              │               └──────────┬──────────┘
-                              │                          │
-                              ▼                          ▼
-                     ┌─────────────────────────────────────────┐
-                     │         Correlation & Aggregation        │
-                     │    (Merge all IOCs, group by source)     │
-                     └────────────────────┬────────────────────┘
-                                          │
-                                          ▼
-                     ┌─────────────────────────────────────────┐
-                     │    LLM Report Generation (Perplexity)    │
-                     │    (Summarize findings into report)      │
-                     └────────────────────┬────────────────────┘
-                                          │
-                                          ▼
-                     ┌─────────────────────────────────────────┐
-                     │    Report Formatting & Telegram Reply     │
-                     └─────────────────────────────────────────┘
-```
+### Pipeline Overview
+
+![Pipeline Architecture](assets/images/architecture.svg)
+
+### n8n Workflow
+
+![Workflow Overview](assets/images/workflow-overview.svg)
+
+### Pipeline Stages
+
+| Stage | Name | Sources | Description |
+|-------|------|---------|-------------|
+| **01** | **Input** | Telegram | Natural language query parsing via regex |
+| **02** | **Research** | CISA KEV, OTX, Perplexity AI | Parallel vulnerability lookup &amp; threat context |
+| **03** | **Extract** | Citation URLs | Web scraping + regex IOC extraction |
+| **04** | **Enrich** | AbuseIPDB, VirusTotal, Hybrid Analysis | Parallel IOC reputation enrichment |
+| **05** | **Correlate** | All sources | Multi-source IOC grouping &amp; aggregation |
+| **06** | **Report** | Perplexity AI + Telegram | LLM report generation &amp; delivery |
 
 ---
 
@@ -77,116 +69,107 @@ And get back a **comprehensive threat intelligence report** covering:
 
 ```
 llm-threat-intel-n8n/
-├── README.md                          # This file
-├── .env.example                       # Environment variable template
-├── docker-compose.yml                 # n8n + dependencies setup
-├── .gitignore                         # Git ignore rules
-├── LICENSE                            # MIT License
+├── README.md                              # Project documentation
+├── LICENSE                                # MIT License
+├── .env.example                           # Environment variable template
+├── .gitignore                             # Git ignore rules
+├── docker-compose.yml                     # n8n container orchestration
+├── assets/
+│   └── images/
+│       ├── architecture.svg               # Pipeline architecture diagram
+│       ├── workflow-overview.svg          # n8n workflow node overview
+│       └── sample-output.svg              # Sample Telegram output
 ├── docs/
-│   ├── ARCHITECTURE.md                # Detailed architecture docs
-│   ├── WORKFLOW_GUIDE.md              # Workflow explanation
-│   └── SETUP_GUIDE.md                 # Detailed setup guide
+│   └── ARCHITECTURE.md                    # Detailed technical documentation
 ├── n8n/
 │   ├── workflows/
-│   │   └── threat-intel-workflow.json # Main n8n workflow (import this)
+│   │   └── threat-intel-workflow.json     # Main workflow (import into n8n)
 │   └── credentials/
-│       └── credentials-template.json  # Credential structure (no secrets)
+│       └── credentials-template.json      # Credential structure reference
 └── scripts/
-    ├── setup.sh                       # Quick setup script
-    └── health-check.sh                # Verify all services are running
+    └── setup.sh                           # Automated setup script
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
 
-- [Docker](https://docs.docker.com/get-docker/) & Docker Compose
-- [n8n](https://n8n.io/) (or use the included docker-compose)
-- API keys for the services below
+- [Docker](https://docs.docker.com/get-docker/) &amp; Docker Compose
+- API keys for the services below ([how to get them](#-api-keys))
 
-### Required API Keys
-
-| Service | Purpose | Get Key |
-|---------|---------|---------|
-| **Telegram Bot** | Send/receive messages | [@BotFather](https://t.me/BotFather) |
-| **Perplexity AI** | LLM threat analysis | [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api) |
-| **AlienVault OTX** | Threat intelligence pulses | [otx.alienvault.com](https://otx.alienvault.com/) |
-| **VirusTotal** | IOC enrichment (IPs, domains, hashes) | [virustotal.com](https://www.virustotal.com/) |
-| **AbuseIPDB** | IP reputation scoring | [abuseipdb.com](https://www.abuseipdb.com/) |
-| **Hybrid Analysis** | Malware hash analysis | [hybrid-analysis.com](https://www.hybrid-analysis.com/) |
-
-### Step-by-Step Setup
-
-#### 1. Clone the Repository
+### Quick Start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/llm-threat-intel-n8n.git
+# 1. Clone the repository
+git clone https://github.com/Malaiyappan-STUX05/llm-threat-intel-n8n.git
 cd llm-threat-intel-n8n
-```
 
-#### 2. Configure Environment Variables
-
-```bash
+# 2. Configure environment variables
 cp .env.example .env
 # Edit .env with your API keys
-nano .env
+
+# 3. Start n8n
+docker-compose up -d
+
+# 4. Open n8n at http://localhost:5678
+# 5. Import the workflow from n8n/workflows/threat-intel-workflow.json
+# 6. Configure credentials (see below)
+# 7. Activate and test!
 ```
 
-#### 3. Start n8n
+### API Keys
+
+| Service | Purpose | Free Tier | Get Key |
+|---------|---------|-----------|---------|
+| **Telegram Bot** | Send/receive messages | Unlimited | [@BotFather](https://t.me/BotFather) |
+| **Perplexity AI** | LLM threat analysis | 5M tokens/mo | [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api) |
+| **AlienVault OTX** | Threat intel pulses | Unlimited | [otx.alienvault.com](https://otx.alienvault.com/) |
+| **VirusTotal** | IOC enrichment | 4 req/min | [virustotal.com](https://www.virustotal.com/) |
+| **AbuseIPDB** | IP reputation | 1000 req/day | [abuseipdb.com](https://www.abuseipdb.com/) |
+| **Hybrid Analysis** | Malware analysis | 200 req/day | [hybrid-analysis.com](https://www.hybrid-analysis.com/) |
+
+### Configuring Credentials in n8n
+
+1. Open n8n → **Settings** → **Credentials** → **Add Credential**
+2. Add each service:
+
+| Credential Name | Type | Configuration |
+|-----------------|------|---------------|
+| Telegram Bot API | `telegramApi` | Paste your bot token |
+| Perplexity AI | `httpHeaderAuth` | Name: `Authorization`, Value: `Bearer YOUR_KEY` |
+| VirusTotal | `httpHeaderAuth` | Name: `x-apikey`, Value: `YOUR_VT_KEY` |
+| AbuseIPDB | `httpHeaderAuth` | Name: `Key`, Value: `YOUR_ABUSEIPDB_KEY` |
+| Hybrid Analysis | `httpHeaderAuth` | Name: `api-key`, Value: `YOUR_HA_KEY` |
+
+> 💡 The OTX API key is configured directly in the workflow's HTTP header node.
+
+### Setting Up the Telegram Webhook
+
+After activating the workflow:
 
 ```bash
-docker-compose up -d
+# Get the webhook URL from the Telegram Trigger node in n8n
+# Then register it with Telegram:
+curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=<WEBHOOK_URL>"
 ```
 
-n8n will be available at `http://localhost:5678`
+### Testing
 
-#### 4. Import the Workflow
+```
+# Send to your Telegram bot:
+analyze latest threat intel on Microsoft Exchange Server 2019
 
-1. Open n8n at `http://localhost:5678`
-2. Go to **Workflows** → **Import from File**
-3. Select `n8n/workflows/threat-intel-workflow.json`
-4. The workflow will appear with all nodes connected
-
-#### 5. Configure Credentials
-
-In n8n, go to **Credentials** and add each service:
-
-1. **Telegram API** — Your bot token from BotFather
-2. **HTTP Header Auth** (Perplexity) — `Bearer YOUR_PPLX_KEY`
-3. **HTTP Header Auth** (VirusTotal) — `x-apikey: YOUR_VT_KEY`
-4. **HTTP Header Auth** (AbuseIPDB) — `Key: YOUR_ABUSEIPDB_KEY`
-5. **HTTP Header Auth** (Hybrid Analysis) — `api-key: YOUR_HA_KEY`
-
-> 💡 The OTX API key is embedded in the HTTP request headers within the workflow itself.
-
-#### 6. Update Webhook URL
-
-The Telegram trigger uses a webhook. After activating the workflow:
-1. Copy the webhook URL from the Telegram Trigger node
-2. Set it via Telegram Bot API:
-   ```
-   https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=<WEBHOOK_URL>
-   ```
-
-#### 7. Activate & Test
-
-1. Click **Activate** on the workflow
-2. Send a message to your Telegram bot:
-   ```
-   analyze latest threat intel on Microsoft Exchange Server 2019
-   ```
-3. Wait 30-60 seconds for the full pipeline to complete
-4. Receive a detailed threat report in Telegram! 🎉
+# Wait 30-60 seconds for the full pipeline
+# Receive a detailed threat report in Telegram! 🎉
+```
 
 ---
 
-## 🔧 Configuration Options
+## 🔧 Configuration
 
 ### Input Format
-
-The workflow expects messages in this exact format:
 
 ```
 analyze latest threat intel on <product> <version>
@@ -198,63 +181,73 @@ analyze latest threat intel on Apache Tomcat 9.0
 analyze latest threat intel on Microsoft Exchange Server 2019
 analyze latest threat intel on Nginx 1.24
 analyze latest threat intel on WordPress 6.4
+analyze latest threat intel on OpenSSL 3.0
 ```
 
-### Customizing Keywords
+### Customization
 
-Edit the **Input validation** node's code to change search keywords:
-
-```javascript
-const keywords = ["CVE", "Vulnerability", "Exploit", "Threat", "Malware"];
-// Add or remove keywords as needed
-```
-
-### Adjusting IOC Limits
-
-- **OTX Search**: Change `limit=5` in the Loop OTX Search URL
-- **Perplexity tokens**: Adjust `max_tokens` in the Pplx intel source body (default: 500)
+| Setting | Location | Default |
+|---------|----------|---------|
+| Search keywords | Input validation node | `["CVE", "Vulnerability", "Exploit", "Threat", "Malware"]` |
+| OTX result limit | Loop OTX Search URL | `5` per keyword |
+| Perplexity max tokens | Pplx intel source body | `500` |
+| Telegram output limit | Report formatting node | `4000` chars |
 
 ---
 
 ## 📊 Data Flow
 
-| Stage | Sources | Output |
-|-------|---------|--------|
-| **1. Input Parsing** | Telegram message | Product name, version, keywords |
-| **2. Vulnerability Lookup** | CISA KEV, AlienVault OTX | Known CVEs for the product |
-| **3. Threat Context** | Perplexity AI (Sonar) | Latest threat intel summary + citations |
-| **4. IOC Extraction** | Citation URLs (web scrape) | CVEs, IPs, domains, file hashes |
-| **5. IOC Enrichment** | VirusTotal, AbuseIPDB, Hybrid Analysis | Reputation scores, malware verdicts |
-| **6. Correlation** | All sources merged | Grouped IOCs with multi-source context |
-| **7. Report Generation** | Perplexity AI (Sonar) | Human-readable threat summary |
-| **8. Delivery** | Telegram | Formatted Markdown report |
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+│  Telegram    │───▶│Input Parsing │───▶│  CISA KEV   │
+│  Message     │    │(Regex extract)│    │  OTX Search │
+└─────────────┘    └──────┬───────┘    │  Perplexity  │
+                          │            └──────┬──────┘
+                          │                   │
+                          │            ┌──────▼──────┐
+                          │            │  IOC Extract │
+                          │            │ (Web scrape) │
+                          │            └──────┬──────┘
+                          │                   │
+                          │     ┌─────────────┼─────────────┐
+                          │     ▼             ▼             ▼
+                          │ ┌────────┐  ┌────────┐  ┌──────────┐
+                          │ │Abuse   │  │Virus   │  │Hybrid    │
+                          │ │IPDB    │  │Total   │  │Analysis  │
+                          │ └───┬────┘  └───┬────┘  └────┬─────┘
+                          │     └─────────────┼───────────┘
+                          │                   ▼
+                          │          ┌──────────────┐
+                          │          │  Correlation  │
+                          │          │  & Aggregation│
+                          │          └──────┬───────┘
+                          │                 ▼
+                          │          ┌──────────────┐
+                          │          │Perplexity AI  │
+                          │          │Report Generate│
+                          │          └──────┬───────┘
+                          │                 ▼
+                          │          ┌──────────────┐
+                          └─────────▶│  Telegram     │
+                                     │  Reply        │
+                                     └──────────────┘
+```
 
 ---
 
-## 🛡️ Security Notes
+## 🛡️ Security
 
-- **Never commit `.env` files** — they contain API secrets
+- **Never commit `.env` files** — contains API secrets
 - **Rotate API keys** regularly
-- **Rate limits**: Be aware of API rate limits on free tiers:
-  - VirusTotal: 4 requests/min (free)
-  - AbuseIPDB: 1000 requests/day (free)
+- **Rate limits** (free tiers):
+  - VirusTotal: 4 requests/min
+  - AbuseIPDB: 1,000 requests/day
+  - Hybrid Analysis: 200 requests/day
   - Perplexity: Check your plan limits
-- **Webhook security**: Use a strong webhook URL (n8n generates one automatically)
-
----
-
-## 📝 Project Report
-
-This project was submitted as the final year B.Tech project at SRM Institute of Science and Technology. The complete project report is available in the `docs/` directory.
+- **Webhook security**: n8n generates a unique webhook URL per workflow
 
 ---
 
 ## 📄 License
 
-MIT License — see [LICENSE](LICENSE) for details.
-
----
-
-## 👨‍💻 Author
-
-**Malaiyappan S** — B.Tech CSE (Cybersecurity), SRM Institute
+[MIT](LICENSE) © 2025 Malaiyappan S
